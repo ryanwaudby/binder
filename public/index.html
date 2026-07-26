@@ -148,9 +148,13 @@
         }
 
         main {
-            max-width: 1100px;
+            max-width: 1500px;
             margin: 0 auto;
             padding: 0 1.25rem 3rem;
+        }
+
+        main.searching {
+            max-width: 1100px;
         }
 
         .card-grid {
@@ -164,6 +168,82 @@
                 grid-template-columns: repeat(3, 1fr);
                 gap: 0.6rem;
             }
+        }
+
+        /* Binder page view: one physical page = a 4x4 sheet, with an
+           explicit divider so scrolling feels like flipping the binder.
+           Desktop shows two facing pages per row, like an open binder. */
+        .binder-spread {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2.5rem;
+        }
+
+        @media (max-width: 760px) {
+            .binder-spread {
+                grid-template-columns: 1fr;
+                gap: 0;
+            }
+        }
+
+        .binder-page {
+            margin-bottom: 1.75rem;
+        }
+
+        .binder-page-header {
+            display: flex;
+            align-items: baseline;
+            gap: 0.5rem;
+            margin-bottom: 0.6rem;
+            padding-bottom: 0.4rem;
+            border-bottom: 2px dashed var(--rule);
+        }
+
+        .binder-page-label {
+            font-family: "JetBrains Mono", monospace;
+            font-weight: 700;
+            font-size: 0.78rem;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: var(--muted);
+        }
+
+        .binder-page-count {
+            font-family: "JetBrains Mono", monospace;
+            font-size: 0.72rem;
+            color: var(--muted);
+            margin-left: auto;
+        }
+
+        .binder-page-sheet {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0.6rem;
+            background: var(--slot-empty);
+            border: 1px solid var(--rule);
+            border-radius: 14px;
+            padding: 0.6rem;
+        }
+
+        @media (max-width: 560px) {
+            .binder-page-sheet {
+                grid-template-columns: repeat(4, 1fr);
+                gap: 0.4rem;
+                padding: 0.4rem;
+            }
+        }
+
+        .binder-slot-empty {
+            aspect-ratio: 3 / 4;
+            border-radius: 10px;
+            border: 2px dashed var(--rule);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: "JetBrains Mono", monospace;
+            font-size: 0.65rem;
+            color: var(--muted);
+            opacity: 0.6;
         }
 
         .poke-card {
@@ -354,7 +434,7 @@
         <div class="bar"><div class="bar-fill" id="barFill" style="width: 0%"></div></div>
     </div>
 
-    <main>
+    <main id="main">
         <div class="card-grid" id="list"></div>
         <p class="empty-msg" id="emptyMsg" style="display:none;">No Pokémon match your search.</p>
     </main>
@@ -385,6 +465,7 @@
 
     <script>
     (function () {
+        var mainEl = document.getElementById("main");
         var listEl = document.getElementById("list");
         var emptyMsg = document.getElementById("emptyMsg");
         var searchEl = document.getElementById("search");
@@ -393,6 +474,94 @@
 
         var species = [];
         var password = sessionStorage.getItem("binderPassword") || "";
+
+        function buildCard(p) {
+            var card = document.createElement("button");
+            card.className = "poke-card" + (p.collected ? " collected" : "");
+            card.setAttribute("aria-pressed", String(p.collected));
+            card.setAttribute("aria-label", (p.collected ? "Remove " : "Mark collected: ") + p.name);
+            card.addEventListener("click", function () { toggleCollected(p.dexNumber); });
+
+            var imgWrap = document.createElement("div");
+            imgWrap.className = "poke-card-image";
+
+            var img = document.createElement("img");
+            img.src = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/" + p.dexNumber + ".png";
+            img.alt = p.name;
+            img.loading = "lazy";
+            imgWrap.appendChild(img);
+
+            var badge = document.createElement("span");
+            badge.className = "check-badge";
+            badge.textContent = "✓";
+            imgWrap.appendChild(badge);
+
+            var info = document.createElement("div");
+            info.className = "poke-card-info";
+            info.innerHTML =
+                '<div class="poke-card-num">#' + String(p.dexNumber).padStart(4, "0") + '</div>' +
+                '<div class="poke-card-name">' + p.name + '</div>' +
+                '<div class="poke-card-loc">Pg <strong>' + p.page + '</strong> · Slot <strong>' + p.slot + '</strong></div>';
+
+            card.appendChild(imgWrap);
+            card.appendChild(info);
+            return card;
+        }
+
+        function renderFlowingGrid(filtered) {
+            listEl.className = "card-grid";
+            filtered.forEach(function (p) {
+                listEl.appendChild(buildCard(p));
+            });
+        }
+
+        function renderBinderPages(filtered) {
+            listEl.className = "binder-spread";
+
+            var byPage = {};
+            filtered.forEach(function (p) {
+                if (!byPage[p.page]) byPage[p.page] = [];
+                byPage[p.page].push(p);
+            });
+
+            var pageNumbers = Object.keys(byPage).map(Number).sort(function (a, b) { return a - b; });
+
+            pageNumbers.forEach(function (pageNum) {
+                var entries = byPage[pageNum];
+                var collectedCount = entries.filter(function (p) { return p.collected; }).length;
+
+                var pageEl = document.createElement("section");
+                pageEl.className = "binder-page";
+
+                var header = document.createElement("div");
+                header.className = "binder-page-header";
+                header.innerHTML =
+                    '<span class="binder-page-label">Page ' + pageNum + '</span>' +
+                    '<span class="binder-page-count">' + collectedCount + ' / ' + entries.length + '</span>';
+                pageEl.appendChild(header);
+
+                var sheet = document.createElement("div");
+                sheet.className = "binder-page-sheet";
+
+                var bySlot = {};
+                entries.forEach(function (p) { bySlot[p.slot] = p; });
+
+                for (var slot = 1; slot <= 16; slot++) {
+                    var p = bySlot[slot];
+                    if (p) {
+                        sheet.appendChild(buildCard(p));
+                    } else {
+                        var empty = document.createElement("div");
+                        empty.className = "binder-slot-empty";
+                        empty.textContent = "—";
+                        sheet.appendChild(empty);
+                    }
+                }
+
+                pageEl.appendChild(sheet);
+                listEl.appendChild(pageEl);
+            });
+        }
 
         function render() {
             var query = searchEl.value.trim().toLowerCase();
@@ -403,39 +572,13 @@
 
             listEl.innerHTML = "";
             emptyMsg.style.display = filtered.length ? "none" : "block";
+            mainEl.classList.toggle("searching", !!query);
 
-            filtered.forEach(function (p) {
-                var card = document.createElement("button");
-                card.className = "poke-card" + (p.collected ? " collected" : "");
-                card.setAttribute("aria-pressed", String(p.collected));
-                card.setAttribute("aria-label", (p.collected ? "Remove " : "Mark collected: ") + p.name);
-                card.addEventListener("click", function () { toggleCollected(p.dexNumber); });
-
-                var imgWrap = document.createElement("div");
-                imgWrap.className = "poke-card-image";
-
-                var img = document.createElement("img");
-                img.src = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/" + p.dexNumber + ".png";
-                img.alt = p.name;
-                img.loading = "lazy";
-                imgWrap.appendChild(img);
-
-                var badge = document.createElement("span");
-                badge.className = "check-badge";
-                badge.textContent = "✓";
-                imgWrap.appendChild(badge);
-
-                var info = document.createElement("div");
-                info.className = "poke-card-info";
-                info.innerHTML =
-                    '<div class="poke-card-num">#' + String(p.dexNumber).padStart(4, "0") + '</div>' +
-                    '<div class="poke-card-name">' + p.name + '</div>' +
-                    '<div class="poke-card-loc">Pg <strong>' + p.page + '</strong> · Slot <strong>' + p.slot + '</strong></div>';
-
-                card.appendChild(imgWrap);
-                card.appendChild(info);
-                listEl.appendChild(card);
-            });
+            if (query) {
+                renderFlowingGrid(filtered);
+            } else {
+                renderBinderPages(filtered);
+            }
         }
 
         function updateStats() {
