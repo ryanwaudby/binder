@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>National Dex Binder</title>
+    <meta name="description" content="Find any Pokémon's page and slot in the binder, and track what we've collected.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg: #faf6ee;
+            --card: #ffffff;
+            --ink: #23281f;
+            --muted: #767a6e;
+            --rule: #e3ddcb;
+            --accent: #2f7a4f;
+            --accent-soft: #e4f1e8;
+            --slot-empty: #f1ede1;
+            --gold: #c99a3c;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #171a14;
+                --card: #20241b;
+                --ink: #eef0e6;
+                --muted: #93987f;
+                --rule: #32362a;
+                --accent: #58b57f;
+                --accent-soft: #223226;
+                --slot-empty: #262a1f;
+                --gold: #d9ac5c;
+            }
+        }
+
+        body {
+            font-family: "Nunito", sans-serif;
+            background: var(--bg);
+            color: var(--ink);
+            min-height: 100vh;
+        }
+
+        header {
+            padding: 1.5rem 1.25rem 1rem;
+            max-width: 760px;
+            margin: 0 auto;
+        }
+
+        .eyebrow {
+            font-family: "JetBrains Mono", monospace;
+            font-size: 0.7rem;
+            font-weight: 700;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--accent);
+        }
+
+        h1 {
+            font-size: clamp(1.6rem, 5vw, 2.1rem);
+            font-weight: 800;
+            letter-spacing: -0.01em;
+            margin-top: 0.3rem;
+        }
+
+        .sub {
+            color: var(--muted);
+            font-size: 0.95rem;
+            margin-top: 0.35rem;
+        }
+
+        .toolbar {
+            max-width: 760px;
+            margin: 0 auto;
+            padding: 0.5rem 1.25rem 1rem;
+            display: flex;
+            gap: 0.6rem;
+            flex-wrap: wrap;
+        }
+
+        input[type="search"] {
+            flex: 1;
+            min-width: 180px;
+            font-family: inherit;
+            font-size: 1rem;
+            padding: 0.7rem 0.9rem;
+            border-radius: 10px;
+            border: 2px solid var(--rule);
+            background: var(--card);
+            color: var(--ink);
+        }
+
+        input[type="search"]:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        button {
+            font-family: "Nunito", sans-serif;
+            font-weight: 700;
+            font-size: 0.9rem;
+            padding: 0.7rem 1.1rem;
+            border-radius: 10px;
+            border: 2px solid var(--rule);
+            background: var(--card);
+            color: var(--ink);
+            cursor: pointer;
+        }
+
+        button:hover { border-color: var(--accent); }
+
+        button.primary {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: #fff;
+        }
+
+        button.primary:hover { opacity: 0.92; }
+
+        .stats {
+            max-width: 760px;
+            margin: 0 auto;
+            padding: 0 1.25rem 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-family: "JetBrains Mono", monospace;
+            font-size: 0.85rem;
+            color: var(--muted);
+        }
+
+        .bar {
+            flex: 1;
+            height: 8px;
+            border-radius: 4px;
+            background: var(--slot-empty);
+            overflow: hidden;
+        }
+
+        .bar-fill {
+            height: 100%;
+            background: var(--accent);
+            border-radius: 4px;
+            transition: width 300ms ease;
+        }
+
+        main {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 0 1.25rem 3rem;
+        }
+
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+            gap: 1rem;
+        }
+
+        @media (max-width: 480px) {
+            .card-grid {
+                grid-template-columns: repeat(3, 1fr);
+                gap: 0.6rem;
+            }
+        }
+
+        .poke-card {
+            position: relative;
+            background: var(--card);
+            border: 2px solid var(--rule);
+            border-radius: 12px;
+            overflow: hidden;
+            cursor: pointer;
+            text-align: left;
+            font-family: inherit;
+            padding: 0;
+            transition: transform 150ms ease, border-color 150ms ease, opacity 150ms ease;
+            opacity: 0.6;
+        }
+
+        .poke-card:hover {
+            transform: translateY(-2px);
+        }
+
+        .poke-card.collected {
+            border-color: var(--accent);
+            opacity: 1;
+        }
+
+        .poke-card-image {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            background: var(--slot-empty);
+        }
+
+        .poke-card-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: block;
+        }
+
+        .poke-card.collected .poke-card-image {
+            background: var(--accent-soft);
+        }
+
+        .check-badge {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            border: 2px solid var(--rule);
+            background: var(--card);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            color: transparent;
+        }
+
+        .poke-card.collected .check-badge {
+            border-color: var(--accent);
+            background: var(--accent);
+            color: #fff;
+        }
+
+        .poke-card-info {
+            padding: 0.5rem 0.6rem 0.65rem;
+        }
+
+        .poke-card-num {
+            font-family: "JetBrains Mono", monospace;
+            font-size: 0.68rem;
+            color: var(--muted);
+            font-weight: 700;
+        }
+
+        .poke-card-name {
+            font-weight: 800;
+            font-size: 0.88rem;
+            line-height: 1.2;
+            margin-top: 0.1rem;
+        }
+
+        .poke-card-loc {
+            font-family: "JetBrains Mono", monospace;
+            font-size: 0.68rem;
+            color: var(--muted);
+            margin-top: 0.3rem;
+        }
+
+        .poke-card-loc strong {
+            color: var(--ink);
+        }
+
+        .empty-msg {
+            text-align: center;
+            color: var(--muted);
+            padding: 3rem 1rem;
+        }
+
+        /* Hunt modal */
+        .modal-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(20, 20, 16, 0.55);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 1.5rem;
+            z-index: 10;
+        }
+
+        .modal-backdrop.open { display: flex; }
+
+        .modal {
+            background: var(--card);
+            border-radius: 16px;
+            padding: 1.75rem;
+            max-width: 360px;
+            width: 100%;
+            text-align: center;
+        }
+
+        .modal .eyebrow { display: block; margin-bottom: 0.5rem; }
+
+        .modal .hunt-name {
+            font-size: 1.6rem;
+            font-weight: 800;
+            margin-bottom: 0.75rem;
+        }
+
+        .modal .hunt-loc {
+            font-family: "JetBrains Mono", monospace;
+            font-size: 1rem;
+            color: var(--muted);
+            margin-bottom: 1.25rem;
+        }
+
+        .modal .hunt-loc strong { color: var(--accent); }
+
+        .modal-actions {
+            display: flex;
+            gap: 0.6rem;
+            justify-content: center;
+        }
+
+        /* Password prompt */
+        .pw-row {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 0.75rem;
+        }
+
+        .pw-row input {
+            flex: 1;
+            font-family: inherit;
+            padding: 0.6rem 0.8rem;
+            border-radius: 8px;
+            border: 2px solid var(--rule);
+            background: var(--bg);
+            color: var(--ink);
+        }
+
+        .error-msg {
+            color: #c0392b;
+            font-size: 0.85rem;
+            margin-top: 0.5rem;
+            display: none;
+        }
+
+        .error-msg.show { display: block; }
+    </style>
+</head>
+<body>
+    <header>
+        <p class="eyebrow">Waudby family binder</p>
+        <h1>National Dex Tracker</h1>
+        <p class="sub">Look up any Pokémon's page &amp; slot, and tick off what's in the binder.</p>
+    </header>
+
+    <div class="toolbar">
+        <input type="search" id="search" placeholder="Search by name or number…" autocomplete="off">
+        <button class="primary" id="huntBtn">Find next card</button>
+    </div>
+
+    <div class="stats">
+        <span id="statText">Loading…</span>
+        <div class="bar"><div class="bar-fill" id="barFill" style="width: 0%"></div></div>
+    </div>
+
+    <main>
+        <div class="card-grid" id="list"></div>
+        <p class="empty-msg" id="emptyMsg" style="display:none;">No Pokémon match your search.</p>
+    </main>
+
+    <div class="modal-backdrop" id="huntModal">
+        <div class="modal">
+            <span class="eyebrow">Go find</span>
+            <div class="hunt-name" id="huntName">—</div>
+            <div class="hunt-loc" id="huntLoc"></div>
+            <div class="modal-actions">
+                <button id="huntAgain">Another one</button>
+                <button class="primary" id="huntClose">Got it</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-backdrop" id="pwModal">
+        <div class="modal">
+            <span class="eyebrow">Edit needs the password</span>
+            <div class="hunt-name" style="font-size:1.1rem;">Enter the family password</div>
+            <div class="pw-row">
+                <input type="password" id="pwInput" autocomplete="off">
+                <button class="primary" id="pwSubmit">OK</button>
+            </div>
+            <p class="error-msg" id="pwError">Incorrect password.</p>
+        </div>
+    </div>
+
+    <script>
+    (function () {
+        var listEl = document.getElementById("list");
+        var emptyMsg = document.getElementById("emptyMsg");
+        var searchEl = document.getElementById("search");
+        var statText = document.getElementById("statText");
+        var barFill = document.getElementById("barFill");
+
+        var species = [];
+        var password = sessionStorage.getItem("binderPassword") || "";
+
+        function render() {
+            var query = searchEl.value.trim().toLowerCase();
+            var filtered = species.filter(function (p) {
+                if (!query) return true;
+                return p.name.toLowerCase().includes(query) || String(p.dexNumber).includes(query);
+            });
+
+            listEl.innerHTML = "";
+            emptyMsg.style.display = filtered.length ? "none" : "block";
+
+            filtered.forEach(function (p) {
+                var card = document.createElement("button");
+                card.className = "poke-card" + (p.collected ? " collected" : "");
+                card.setAttribute("aria-pressed", String(p.collected));
+                card.setAttribute("aria-label", (p.collected ? "Remove " : "Mark collected: ") + p.name);
+                card.addEventListener("click", function () { toggleCollected(p.dexNumber); });
+
+                var imgWrap = document.createElement("div");
+                imgWrap.className = "poke-card-image";
+
+                var img = document.createElement("img");
+                img.src = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/" + p.dexNumber + ".png";
+                img.alt = p.name;
+                img.loading = "lazy";
+                imgWrap.appendChild(img);
+
+                var badge = document.createElement("span");
+                badge.className = "check-badge";
+                badge.textContent = "✓";
+                imgWrap.appendChild(badge);
+
+                var info = document.createElement("div");
+                info.className = "poke-card-info";
+                info.innerHTML =
+                    '<div class="poke-card-num">#' + String(p.dexNumber).padStart(4, "0") + '</div>' +
+                    '<div class="poke-card-name">' + p.name + '</div>' +
+                    '<div class="poke-card-loc">Pg <strong>' + p.page + '</strong> · Slot <strong>' + p.slot + '</strong></div>';
+
+                card.appendChild(imgWrap);
+                card.appendChild(info);
+                listEl.appendChild(card);
+            });
+        }
+
+        function updateStats() {
+            var total = species.length;
+            var collected = species.filter(function (p) { return p.collected; }).length;
+            statText.textContent = collected + " / " + total + " collected";
+            barFill.style.width = (total ? (collected / total * 100) : 0) + "%";
+        }
+
+        async function loadSpecies() {
+            var res = await fetch("/api/species");
+            var data = await res.json();
+            species = data.species;
+            render();
+            updateStats();
+        }
+
+        searchEl.addEventListener("input", render);
+
+        // --- password-gated edits ---
+        var pwModal = document.getElementById("pwModal");
+        var pwInput = document.getElementById("pwInput");
+        var pwSubmit = document.getElementById("pwSubmit");
+        var pwError = document.getElementById("pwError");
+        var pendingDexNumber = null;
+
+        function toggleCollected(dexNumber) {
+            if (password) {
+                submitToggle(dexNumber, password);
+            } else {
+                pendingDexNumber = dexNumber;
+                pwError.classList.remove("show");
+                pwInput.value = "";
+                pwModal.classList.add("open");
+                pwInput.focus();
+            }
+        }
+
+        async function submitToggle(dexNumber, pw) {
+            var res = await fetch("/api/collect", {
+                method: "POST",
+                headers: {
+                    "content-type": "application/json",
+                    "authorization": "Bearer " + pw
+                },
+                body: JSON.stringify({ dexNumber: dexNumber })
+            });
+
+            if (res.status === 401) {
+                password = "";
+                sessionStorage.removeItem("binderPassword");
+                pendingDexNumber = dexNumber;
+                pwError.classList.add("show");
+                pwModal.classList.add("open");
+                return false;
+            }
+
+            var data = await res.json();
+            var entry = species.find(function (p) { return p.dexNumber === dexNumber; });
+            if (entry) {
+                entry.collected = data.collected;
+                entry.collectedAt = data.collectedAt || null;
+            }
+            render();
+            updateStats();
+            return true;
+        }
+
+        pwSubmit.addEventListener("click", async function () {
+            var pw = pwInput.value;
+            if (!pw || pendingDexNumber === null) return;
+            var ok = await submitToggle(pendingDexNumber, pw);
+            if (ok) {
+                password = pw;
+                sessionStorage.setItem("binderPassword", pw);
+                pwModal.classList.remove("open");
+                pendingDexNumber = null;
+            }
+        });
+
+        pwInput.addEventListener("keydown", function (e) {
+            if (e.key === "Enter") pwSubmit.click();
+        });
+
+        pwModal.addEventListener("click", function (e) {
+            if (e.target === pwModal) pwModal.classList.remove("open");
+        });
+
+        // --- random hunt ---
+        var huntModal = document.getElementById("huntModal");
+        var huntName = document.getElementById("huntName");
+        var huntLoc = document.getElementById("huntLoc");
+
+        async function runHunt() {
+            var res = await fetch("/api/random-hunt");
+            var data = await res.json();
+            if (data.done) {
+                huntName.textContent = "You have them all!";
+                huntLoc.textContent = "";
+            } else {
+                huntName.textContent = "#" + String(data.dexNumber).padStart(4, "0") + " " + data.name;
+                huntLoc.innerHTML = "Page <strong>" + data.page + "</strong> · Slot <strong>" + data.slot + "</strong>";
+            }
+            huntModal.classList.add("open");
+        }
+
+        document.getElementById("huntBtn").addEventListener("click", runHunt);
+        document.getElementById("huntAgain").addEventListener("click", runHunt);
+        document.getElementById("huntClose").addEventListener("click", function () {
+            huntModal.classList.remove("open");
+        });
+        huntModal.addEventListener("click", function (e) {
+            if (e.target === huntModal) huntModal.classList.remove("open");
+        });
+
+        loadSpecies();
+    })();
+    </script>
+</body>
+</html>
