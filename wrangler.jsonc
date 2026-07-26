@@ -10,6 +10,9 @@
     "directory": "public",
     "binding": "ASSETS"
   },
+  "routes": [
+    { "pattern": "binder.waudby.me", "custom_domain": true }
+  ],
   "d1_databases": [
     {
       "binding": "DB",
